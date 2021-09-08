@@ -1,6 +1,6 @@
 from mongoengine import *
 import datetime 
-
+from enum import Enum
 
 class Project(EmbeddedDocument):
     projectGithub = StringField()
@@ -8,7 +8,7 @@ class Project(EmbeddedDocument):
     bannerImage = StringField()
     twitterHandle = StringField(max_length=30)
     keywords = ListField(StringField(max_length=30))
-    endDate = DateTimeField()
+    endDate = DateTimeField(null=True)
 
 
 class Metadata(EmbeddedDocument):
@@ -27,9 +27,30 @@ class Grant(Document):
     date_modified = DateTimeField(default=datetime.datetime.utcnow)
 
 
+class Status(Enum):
+    YES = 'yes'
+    UNSURE = 'unsure'
+    NO = 'no'
+
+
+class Requirement(Enum):
+    CORRECT_CATEGORY = 'correct_category'
+    CATEGORY_ALLOWED = 'category_is_allowed_on_the_platform' 
+    REASONABLE_DESCRIPTION = 'having_a_reasonable_description'
+    NO_OFFENSIVE = 'not_being_offensive'
+    LEGITIMATE_PROJECT = 'coming_from_a_legitimate_project'
+    
+
 class Vote(Document):
     address = StringField(required=True, max_length=100)
     grant =  ReferenceField(Grant)
     date_modified = DateTimeField(default=datetime.datetime.utcnow)
+    requirements = EmbeddedDocumentField(Metadata)
+    status = EnumField(Status, default=Status.UNSURE)
+    requirement = EnumField(Requirement)
 
-
+    meta = {
+        'indexes': [
+            {'fields': ('address', 'grant', 'requirement'), 'unique': True}
+        ]
+    }
