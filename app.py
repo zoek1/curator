@@ -26,7 +26,7 @@ def manage_grants():
 
 
     total_grants = models.Grant.objects.count()
-    grant = models.Grant.objects[random.randint(0, total_grants)]
+    # grant = models.Grant.objects[random.randint(0, total_grants)]
     
     voted_grants = [ x.grant_id for x in models.Vote.objects(address=address).only('grant').distinct(field="grant") ]
 
@@ -41,7 +41,8 @@ def manage_grants():
         }},
         { '$addFields': {'score': {'$size': "$votes"} } },
         { '$sort': { 'score': 1} },
-        { '$limit': 1 }
+        { '$sample': { 'size': 3 } }
+        # { '$limit': 1 }
     ]
 
     for grant in models.Grant.objects().aggregate(pipeline):
