@@ -3,6 +3,9 @@ from flask_cors import CORS
 from flask_mongoengine import MongoEngine
 import models
 import random
+import utils
+
+
 # configuration
 DEBUG = True
 
@@ -23,7 +26,24 @@ db = MongoEngine(app)
 @app.route('/grant', methods=['GET', 'POST'])
 def manage_grants():
     address = request.args.get('address')
+    
+    if request.method == 'POST' and address:
+        payload = request.json
+        weight = utils.calculate_gtc_reputation(address)/len(payload['answers'])
+        grant = models.Grant.objects(pk=payload['grant']).first()
+        
+        for answer in payload['answers']:
+          vote = models.Vote(address=address, grant=grant.pk)
+          vote.status=answer['answer']
+          vote.requirement=answer['id']
+          vote.score=weight
+          
+          print(vote._data)
+          vote.save()
 
+        return jsonify({
+          'status': 'ok'
+        })
 
     total_grants = models.Grant.objects.count()
     # grant = models.Grant.objects[random.randint(0, total_grants)]

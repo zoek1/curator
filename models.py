@@ -48,6 +48,7 @@ class Vote(Document):
     requirements = EmbeddedDocumentField(Metadata)
     status = EnumField(Status, default=Status.UNSURE)
     requirement = EnumField(Requirement)
+    score = FloatField()
 
     meta = {
         'indexes': [

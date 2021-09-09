@@ -25,7 +25,7 @@
         {{ handle }}
         </a>
     </div>
-    <Quiz :key='grant._id' :grandId='grant._id' @answered='sendCuration' />
+    <Quiz :key='grant._id' :grandId='grant._id' @answered='sendCuration' v-if='address' />
   </div>
   </div>
 </template>
