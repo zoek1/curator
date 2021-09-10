@@ -24,7 +24,6 @@ The list of grants of the current cycle can be consulted here: [http://localhost
 One specific grant curation can be consulted by the api here: [http://localhost:5000/harvest/3380](http://localhost:5000/harvest/3380)
 
 
-https://www.loom.com/share/a1955e2eea1e469dadd1825383d4c3f7
-
+https://www.loom.com/share/3d74629966e54d8ca7d878ff8ba4d03d
 
 
