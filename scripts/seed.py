@@ -72,7 +72,7 @@ grants = get_grants(copy.deepcopy(options), 10)
 
 cleaned_grants = [ convert_grant(grant) for grant in grants]
 
-mongoengine.connect('grants')
+mongoengine.connect('grants', host='mongo')
 
 for grant in cleaned_grants:
     grant = models.Grant(grant_id=grant['id'], owner=grant['owner'], payee=grant['payee'], metaPtr=grant['metaPtr'],

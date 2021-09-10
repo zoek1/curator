@@ -14,6 +14,7 @@ app = Flask(__name__)
 app.config.from_object(__name__)
 
 app.config['MONGODB_SETTINGS'] = {
+    'host': 'mongo',
     'db': 'grants'
 }
 
@@ -23,13 +24,60 @@ CORS(app, resources={r'/*': {'origins': '*'}})
 db = MongoEngine(app)
 
 
+
+@app.route('/harvest/<grant_id>', methods=['GET'])
+def harvest_curated_grants(grant_id):
+    grant = models.Grant.objects(pk=grant_id).first()
+    pipeline = [
+    	{ '$match': {'grant': grant.pk } },
+    	{'$group': {'_id': {'$concat': ['$requirement', '_','$status']}, 'total': {'$sum': {'$sum': [1, '$score']}}}}
+    ]
+    requirements = {}
+    mods = []
+    positive = 0
+    negative = 0
+
+    for doc in models.Vote.objects().aggregate(pipeline):
+       print(doc) 
+       requirements[doc['_id']] = doc['total']
+    
+    print(requirements)
+    for r in ['correct_category',
+   	'category_is_allowed_on_the_platform',
+   	'having_a_reasonable_description',
+   	'not_being_offensive',
+   	'coming_from_a_legitimate_project']:
+        if requirements.get(f'{r}_yes', 0) < requirements.get(f'{r}_no', 0):
+            mods.append(r)
+            negative += 100/5
+            print(negative)
+            print(positive)
+        elif requirements.get(f'{r}_yes', 0) > requirements.get(f'{r}_no', 0):
+            positive += 100/5
+            print(negative)
+            print(positive)
+        
+    result = 'fail' if negative > positive else 'mods' if len(mods) else 'pending' if positive == 0 and negative == 0 else 'pass'
+    confidence = negative if negative > positive else positive
+    mod_required = bool(len(mods))
+    return jsonify({
+     "id": grant.pk,
+     "result": result,
+     "confidence": confidence,
+     "mod_required": mod_required,
+     "data": {
+         "mods": mods
+     }
+   })
+
+
 @app.route('/grant', methods=['GET', 'POST'])
 def manage_grants():
     address = request.args.get('address')
     
     if request.method == 'POST' and address:
         payload = request.json
-        weight = utils.calculate_gtc_reputation(address)/len(payload['answers'])
+        weight = utils.calculate_gtc_reputation(address)/len(payload['answers']) or 0.001
         grant = models.Grant.objects(pk=payload['grant']).first()
         
         for answer in payload['answers']:
@@ -70,6 +118,67 @@ def manage_grants():
 
     # return jsonify(grant._data)
 
+@app.route('/harvest')
+def harvest_curations():
+    pipeline = [
+    { 
+        '$lookup': {
+            'from': 'vote',
+            'localField': '_id',
+            'foreignField': 'grant',
+            'as': 'votes'
+    }},
+    { '$project': {
+        'yes': { 
+          '$filter': 
+          { 
+            'input': "$votes", 
+            'as': "vote", 
+            'cond': { '$eq': [ "$$vote.status", 'yes' ] } 
+          } 
+        },
+        'no': { 
+          '$filter': 
+          { 
+            'input': "$votes", 
+            'as': "vote", 
+            'cond': { '$eq': [ "$$vote.status", 'no' ] } 
+          } 
+        },
+        'unsure': { 
+          '$filter': 
+          { 
+            'input': "$votes", 
+            'as': "vote", 
+            'cond': { '$eq': [ "$$vote.status", 'unsure' ] } 
+          } 
+        },
+        'votes': 1
+      }
+    },
+    { '$addFields': {'yes_total': {'$size': "$yes"}, 'no_total': {'$size': "$no"}, 'unsure_total': {'$size': "$unsure"}, 'total': {'$size': "$votes"},  } },
+    { '$project': {
+        'yes_total': 1, 
+        'no_total': 1, 
+        'unsure_total': 1, 
+        'total': 1, 
+        'status': {'$cond': [{'$eq': ['$total', 0]}, 
+                             'pending', 
+                             {'$cond': [{'gte': ['$yes_total', '$no_total']}, 'pass', 'fail']}]},
+        'score': {'$cond': [{'$eq': ['$total', 0]}, 
+                            0, 
+                            {'$cond': [
+                                {'gte': ['$yes_total', '$no_total']}, 
+                                {'$divide': ['$yes_total', '$total']}, 
+                                {'$divide': ['$no_total', '$total']}]}]},
+      },
+    },
+    { '$sort': {'total': -1}}
+    ]
+
+    
+
+    return jsonify({ 'grants': [{ grant['_id']: grant['status']  } for grant in models.Grant.objects().aggregate(pipeline)]})
 
 if __name__ == '__main__':
     app.run()
